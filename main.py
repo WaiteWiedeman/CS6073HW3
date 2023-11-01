@@ -1,16 +1,17 @@
 # imports
-from load_data import LoadData
+from loaddata import LoadData
 import matplotlib.pyplot as plt
-from load_data import PreprocessData
+from loaddata import PreprocessData
 import imageio
 from sklearn.model_selection import train_test_split
 from model import UNet
+from model import get_model
 import tensorflow as tf
 import numpy as np
 
 
-path = '/Users/fungi/PycharmProjects/cs6073hw3/Data/train/image'
-path2 = '/Users/fungi/PycharmProjects/cs6073hw3/Data/train/mask'
+path = '/Users/fungi/PycharmProjects/pythonProject2/Data/image'
+path2 = '/Users/fungi/PycharmProjects/pythonProject2/Data/mask'
 
 img, msk = LoadData(path, path2)
 '''
@@ -52,15 +53,15 @@ plt.show()
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=123)
 #print(X_train.shape)
 #'''
-unet = UNet(input_size=(128,128,3), n_filters=32, n_classes=3)
+unet = get_model((128, 128),3)  # UNet(input_size=(128, 128, 3), n_filters=32, n_classes=3)
 learn_rate = 0.001
 opt = tf.keras.optimizers.Adam(learning_rate=learn_rate)
 unet.compile(optimizer=opt,
-             loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+             loss="sparse_categorical_crossentropy",  # tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
               metrics=['accuracy'])
-reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='accuracy', factor=0.2, patience=1, min_lr=0.00001)
+#reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='accuracy', factor=0.2, patience=1, min_lr=0.00001)
 
-results = unet.fit(X_train, y_train, batch_size=20, epochs=10, validation_split=0.2, callbacks=reduce_lr)
+results = unet.fit(X_train, y_train, batch_size=20, epochs=10, validation_split=0.2)  # , callbacks=reduce_lr
 
 fig, axis = plt.subplots(1, 2, figsize=(20, 5))
 axis[0].plot(results.history["loss"], color='r', label = 'train loss')
@@ -72,7 +73,7 @@ axis[1].plot(results.history["val_accuracy"], color='b', label = 'dev accuracy')
 axis[1].set_title('Accuracy Comparison')
 axis[1].legend()
 plt.show()
-#'''
+
 unet.evaluate(X_test, y_test)
 def VisualizeResults(index):
     img = X_test[index]
@@ -92,4 +93,3 @@ index = 1
 VisualizeResults(index)
 plt.show()
 #'''
-
