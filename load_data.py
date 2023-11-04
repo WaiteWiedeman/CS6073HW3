@@ -4,17 +4,14 @@ import numpy as np
 from PIL import Image
 
 
+# function to load data
+# takes paths as input and returns images and masks
 def LoadData(path1, path2):
-    """
-    Looks for relevant filenames in the shared path
-    Returns 2 lists for original and masked files respectively
-
-    """
-    # Read the images folder like a list
+    # read images and masks from path
     image_dataset = os.listdir(path1)
     mask_dataset = os.listdir(path2)
 
-    # Make a list for images and masks filenames
+    # make a list for images and masks filenames
     orig_img = []
     mask_img = []
     for file in image_dataset:
@@ -22,20 +19,18 @@ def LoadData(path1, path2):
     for file in mask_dataset:
         mask_img.append(file)
 
-    # Sort the lists to get both of them in same order (the dataset has exactly the same name for images and corresponding masks)
+    # sort the lists
     orig_img.sort()
     mask_img.sort()
 
     return orig_img, mask_img
 
 
+# function to preprocess images
+# takes images, masks, desired image and mask shapes, and file paths as input
+# returns NumPy dataset with preprocessed images as 3-D arrays of desired size
 def PreprocessData(img, mask, target_shape_img, target_shape_mask, path1, path2):
-    """
-    Processes the images and mask present in the shared list and path
-    Returns a NumPy dataset with images as 3-D arrays of desired size
-    Please note the masks in this dataset have only one channel
-    """
-    # Pull the relevant dimensions for image and mask
+    # pull the relevant dimensions for image and mask
     m = len(img)  # number of images
     i_h, i_w, i_c = target_shape_img  # pull height, width, and channels of image
     m_h, m_w, m_c = target_shape_mask  # pull height, width, and channels of mask
@@ -52,21 +47,18 @@ def PreprocessData(img, mask, target_shape_img, target_shape_mask, path1, path2)
         single_img = Image.open(path).convert('RGB')
         single_img = single_img.resize((i_h, i_w))
         single_img = np.reshape(single_img, (i_h, i_w, i_c))
-        single_img = single_img / 256.0
+        single_img = single_img  # / 256.0
         X[index] = single_img
 
         # convert mask into an array of desired shape (1 channel)
         single_mask_ind = mask[index]
         path = os.path.join(path2, single_mask_ind)
-        threshold = 127
-        single_mask = Image.open(path)  # .convert('L')
-        #single_mask = single_mask.point(lambda x: 0 if x==0 else 255, '1')
+        single_mask = Image.open(path)
         single_mask = single_mask.resize((m_h, m_w))
         single_mask = np.array(single_mask)
         single_mask = np.reshape(single_mask, (m_h, m_w, m_c))
         single_mask[single_mask <= 35] = 0
         single_mask[single_mask > 35] = 1
-        #single_mask = single_mask - 1  # to ensure classes #s start from 0
         y[index] = single_mask
     return X, y
 

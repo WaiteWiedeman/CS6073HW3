@@ -1,95 +1,68 @@
 # imports
-from loaddata import LoadData
+from load_data import LoadData
 import matplotlib.pyplot as plt
-from loaddata import PreprocessData
+from load_data import PreprocessData
 import imageio
 from sklearn.model_selection import train_test_split
-from model import UNet
-from model import get_model
+from model import UNet4, UNet3, UNet2
 import tensorflow as tf
 import numpy as np
+from visualization import vis_input, vis_preprocess, plot_train, vis_output, dice_plot
+from testmodel import test_model
+from training import train_model
 
-
-path = '/Users/fungi/PycharmProjects/pythonProject2/Data/image'
-path2 = '/Users/fungi/PycharmProjects/pythonProject2/Data/mask'
-
+# the following variables are the paths to the image and mask files
+path = '/Users/fungi/PycharmProjects/cs6073hw3/Data/train/image'
+path2 = '/Users/fungi/PycharmProjects/cs6073hw3/Data/train/mask'
+# call "LoadData" function with paths as input
 img, msk = LoadData(path, path2)
-'''
-show_images = 1
-for i in range(show_images):
-    img_view = imageio.v2.imread(path + '/' + img[i])
-    mask_view = imageio.v2.imread(path2 + '/' + msk[i])
-    print(img_view.shape)
-    print(mask_view.shape)
-    fig, arr = plt.subplots(1, 2, figsize=(15, 15))
-    arr[0].imshow(img_view)
-    arr[0].set_title('Image ' + str(i))
-    arr[1].imshow(mask_view)
-    arr[1].set_title('Masked Image ' + str(i))
-#plt.show()
-'''
+# function shows the image and corresponding mask
+show_images = 1  # number of images to show
+vis_input(show_images,path,path2,img,msk)  # function call
+# the following are the desired image and mask dimensions for preprocessing
 target_shape_img = [128, 128, 3]
 target_shape_mask = [128, 128, 1]
-
+# call function to preprocess data
 X, y = PreprocessData(img, msk, target_shape_img, target_shape_mask, path, path2)
-'''
-# QC the shape of output and classes in output dataset
-print("X Shape:", X.shape)
-print("Y shape:", y.shape)
-# There are 3 classes : background, pet, outline
-print(np.unique(y))
-np.set_printoptions(threshold=np.inf)
-#print(y[50])
+# calls function to display image and mask after preprocessing
+vis_preprocess(X,y)
+# splits data into training and testing
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=123)
+# calls 4-layer UNet
+unet4 = UNet4(input_size=(128,128,3), n_filters=32, n_classes=2)
+metric_names4 = ['mean_io_u', 'val_mean_io_u']  # names of metrics for plot
+# calls 3-layer UNet
+unet3 = UNet3(input_size=(128,128,3), n_filters=32, n_classes=2)
+metric_names3 = ['mean_io_u_1', 'val_mean_io_u_1']  # names of metrics for plot
+# calls 2-layer UNet
+unet2 = UNet2(input_size=(128,128,3), n_filters=32, n_classes=2)
+metric_names2 = ['mean_io_u_2', 'val_mean_io_u_2']  # names of metrics for plot
 
-# Visualize the output
-image_index = 0
-fig, arr = plt.subplots(1, 2, figsize=(15, 15))
-arr[0].imshow(X[image_index])
-arr[0].set_title('Processed Image')
-arr[1].imshow(y[image_index,:,:,0])
-arr[1].set_title('Processed Masked Image ')
+learn_rate = 0.0001  # desired learning rate for training
+epochs = 50  # desired number of epochs for training
+# function called to train each model
+results4 = train_model(unet4,X_train,y_train,learn_rate,epochs)
+results3 = train_model(unet3,X_train,y_train,learn_rate,epochs)
+results2 = train_model(unet2,X_train,y_train,learn_rate,epochs)
+# function called to plot model training histories
+plot_train(results4,metric_names4)
+plot_train(results3,metric_names3)
+plot_train(results2,metric_names2)
+# function called to get predictions from test data
+pred_y4 = test_model(unet4, X_test, y_test)
+pred_y3 = test_model(unet3, X_test, y_test)
+pred_y2 = test_model(unet2, X_test, y_test)
+
+index = 1  # test image to show predictions for
+# function called to display input image, target mask, and all model predictions
+vis_output(index,X_test,y_test,pred_y4[0],pred_y3[0],pred_y2[0])
+# plots of dice coefficient for each test image
+dice_plot(y_test,pred_y4)
+dice_plot(y_test,pred_y3)
+dice_plot(y_test,pred_y2)
+# saving models
+unet4.save('UNet4layer.keras')
+unet3.save('UNet3layer.keras')
+unet2.save('UNet2layer.keras')
+# show plots
 plt.show()
-'''
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=123)
-#print(X_train.shape)
-#'''
-unet = get_model((128, 128),3)  # UNet(input_size=(128, 128, 3), n_filters=32, n_classes=3)
-learn_rate = 0.001
-opt = tf.keras.optimizers.Adam(learning_rate=learn_rate)
-unet.compile(optimizer=opt,
-             loss="sparse_categorical_crossentropy",  # tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-              metrics=['accuracy'])
-#reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='accuracy', factor=0.2, patience=1, min_lr=0.00001)
-
-results = unet.fit(X_train, y_train, batch_size=20, epochs=10, validation_split=0.2)  # , callbacks=reduce_lr
-
-fig, axis = plt.subplots(1, 2, figsize=(20, 5))
-axis[0].plot(results.history["loss"], color='r', label = 'train loss')
-axis[0].plot(results.history["val_loss"], color='b', label = 'dev loss')
-axis[0].set_title('Loss Comparison')
-axis[0].legend()
-axis[1].plot(results.history["accuracy"], color='r', label = 'train accuracy')
-axis[1].plot(results.history["val_accuracy"], color='b', label = 'dev accuracy')
-axis[1].set_title('Accuracy Comparison')
-axis[1].legend()
-plt.show()
-
-unet.evaluate(X_test, y_test)
-def VisualizeResults(index):
-    img = X_test[index]
-    img = img[np.newaxis, ...]
-    pred_y = unet.predict(img)
-    pred_mask = tf.argmax(pred_y[0], axis=-1)
-    pred_mask = pred_mask[..., tf.newaxis]
-    fig, arr = plt.subplots(1, 3, figsize=(15, 15))
-    arr[0].imshow(X_test[index])
-    arr[0].set_title('Processed Image')
-    arr[1].imshow(y_test[index,:,:,0])
-    arr[1].set_title('Actual Masked Image ')
-    arr[2].imshow(pred_mask[:,:,0])
-    arr[2].set_title('Predicted Masked Image ')
-
-index = 1
-VisualizeResults(index)
-plt.show()
-#'''
